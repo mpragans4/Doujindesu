@@ -694,6 +694,56 @@ function transformForSEO(document, targetUrl, origin, mirrorHostname, requestPat
 }
 
 // ============================================================
+// Route: Static uploads proxy (images, etc.)
+// ============================================================
+app.get("/uploads/*", async (req, res) => {
+  try {
+    const imageUrl = `https://${ORIGINAL_HOST}${req.originalUrl}`;
+
+    const cached = imageCache.get(imageUrl);
+    if (cached) {
+      res.set({
+        "Content-Type": cached.contentType,
+        "Access-Control-Allow-Origin": "*",
+        "Cache-Control": "public, max-age=31536000",
+        "X-Cache": "HIT",
+      });
+      return res.status(200).send(cached.body);
+    }
+
+    const imageResponse = await curlFetch(imageUrl, {
+      referer: `https://${ORIGINAL_HOST}/`,
+      headers: {
+        Accept: "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+        "Sec-Fetch-Dest": "image",
+        "Sec-Fetch-Mode": "no-cors",
+        "Sec-Fetch-Site": "same-origin",
+      },
+    });
+
+    if (!imageResponse.ok) {
+      return res.status(imageResponse.status).send("Image fetch failed");
+    }
+
+    const contentType = imageResponse.headers.get("content-type") || "image/png";
+    const body = imageResponse.body;
+
+    imageCache.set(imageUrl, { body, contentType });
+
+    res.set({
+      "Content-Type": contentType,
+      "Access-Control-Allow-Origin": "*",
+      "Cache-Control": "public, max-age=31536000",
+      "X-Cache": "MISS",
+    });
+    res.status(200).send(body);
+  } catch (error) {
+    console.error("Upload proxy error:", error.message);
+    res.status(500).send("Image proxy error");
+  }
+});
+
+// ============================================================
 // Route: Catch-all proxy
 // ============================================================
 app.all("*", async (req, res) => {
