@@ -436,6 +436,14 @@ app.use((req, res, next) => {
 });
 
 // ============================================================
+// Route: Google Search Console Verification
+// ============================================================
+app.get("/googleac5658b393fed138.html", (req, res) => {
+  res.set({ "Content-Type": "text/html", "Cache-Control": "public, max-age=86400" });
+  res.status(200).send("google-site-verification: googleac5658b393fed138.html");
+});
+
+// ============================================================
 // Route: robots.txt
 // ============================================================
 app.get("/robots.txt", (req, res) => {
