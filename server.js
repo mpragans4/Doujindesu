@@ -175,8 +175,9 @@ async function curlFetch(url, options = {}) {
     args.push("--data-binary", "@-");
   }
 
-  // URL
-  args.push(url);
+  // URL — encode any raw spaces/special chars that curl rejects
+  const safeUrl = url.replace(/ /g, "%20").replace(/\(/g, "%28").replace(/\)/g, "%29");
+  args.push(safeUrl);
 
   try {
     const result = await execFileAsync(curlBinary, args, {
@@ -405,10 +406,22 @@ app.get(`${IMAGE_PROXY_PATH}*`, async (req, res) => {
       return res.status(200).send(cached.body);
     }
 
+    // Determine proper referer based on image domain
+    let imageReferer = `https://${ORIGINAL_HOST}/`;
+    try {
+      const imgHost = new URL(imageUrl).hostname;
+      if (imgHost.includes("doujindesu")) {
+        imageReferer = `https://${imgHost}/`;
+      }
+    } catch (_) {}
+
     const imageResponse = await curlFetch(imageUrl, {
+      referer: imageReferer,
       headers: {
-        Referer: `https://${ORIGINAL_HOST}/`,
         Accept: "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+        "Sec-Fetch-Dest": "image",
+        "Sec-Fetch-Mode": "no-cors",
+        "Sec-Fetch-Site": "cross-site",
       },
     });
 
@@ -583,13 +596,45 @@ function transformForSEO(document, targetUrl, origin, mirrorHostname, requestPat
   document.querySelectorAll("*[onclick]").forEach((el) => el.removeAttribute("onclick"));
 
   // ---- 9. Rewrite image URLs ----
-  document.querySelectorAll('img[src*="desu.photos"]').forEach((el) => {
+  // Proxy images from all doujindesu-related domains to bypass hotlink protection
+  const proxyImageDomains = ["desu.photos", "doujindesu.moe", "doujindesu.tv", "doujindesu.xxx", "cdn.doujindesu.dev", "doujindesu.dev"];
+  const shouldProxyImg = (url) => proxyImageDomains.some((d) => url && url.includes(d));
+
+  document.querySelectorAll("img").forEach((el) => {
     const src = el.getAttribute("src");
-    if (src) el.setAttribute("src", `${IMAGE_PROXY_PATH}${encodeURIComponent(src)}`);
+    if (shouldProxyImg(src)) {
+      el.setAttribute("src", `${IMAGE_PROXY_PATH}${encodeURIComponent(src)}`);
+    }
+    const dataSrc = el.getAttribute("data-src");
+    if (shouldProxyImg(dataSrc)) {
+      el.setAttribute("data-src", `${IMAGE_PROXY_PATH}${encodeURIComponent(dataSrc)}`);
+    }
+    const lazySrc = el.getAttribute("data-lazy-src");
+    if (shouldProxyImg(lazySrc)) {
+      el.setAttribute("data-lazy-src", `${IMAGE_PROXY_PATH}${encodeURIComponent(lazySrc)}`);
+    }
   });
-  document.querySelectorAll('img[data-src*="desu.photos"]').forEach((el) => {
-    const src = el.getAttribute("data-src");
-    if (src) el.setAttribute("data-src", `${IMAGE_PROXY_PATH}${encodeURIComponent(src)}`);
+
+  // Also proxy background images and other image references
+  document.querySelectorAll("[style]").forEach((el) => {
+    const style = el.getAttribute("style");
+    if (style) {
+      const rewritten = style.replace(/url\(['"]?(https?:\/\/[^'"\)]+)['"]?\)/gi, (match, url) => {
+        if (shouldProxyImg(url)) {
+          return `url('${IMAGE_PROXY_PATH}${encodeURIComponent(url)}')`;
+        }
+        return match;
+      });
+      if (rewritten !== style) el.setAttribute("style", rewritten);
+    }
+  });
+
+  // Proxy source elements (picture/source)
+  document.querySelectorAll("source").forEach((el) => {
+    const srcset = el.getAttribute("srcset");
+    if (shouldProxyImg(srcset)) {
+      el.setAttribute("srcset", `${IMAGE_PROXY_PATH}${encodeURIComponent(srcset)}`);
+    }
   });
 
   return document;
