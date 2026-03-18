@@ -673,7 +673,7 @@ function transformForSEO(document, targetUrl, origin, mirrorHostname, requestPat
   const titleEl = document.querySelector("title");
   if (titleEl) {
     let title = titleEl.textContent || "";
-    title = title.replace(/doujindesu/gi, SITE_NAME).replace(/\s*[-|–]\s*$/, "");
+    title = title.replace(/doujindesu(\.\w+)?/gi, SITE_NAME).replace(/\s*[-|–]\s*$/, "");
     if (!title.includes(SITE_NAME)) title = `${title} - ${SITE_NAME}`;
     titleEl.textContent = title;
   }
@@ -682,7 +682,7 @@ function transformForSEO(document, targetUrl, origin, mirrorHostname, requestPat
   const metaDesc = document.querySelector('meta[name="description"]');
   if (metaDesc) {
     let desc = metaDesc.getAttribute("content") || "";
-    desc = desc.replace(/doujindesu/gi, SITE_NAME);
+    desc = desc.replace(/doujindesu(\.\w+)?/gi, SITE_NAME);
     desc = desc.length > 0 ? `${desc} | Baca di ${SITE_NAME}` : `${SITE_TAGLINE} - ${SITE_NAME}`;
     metaDesc.setAttribute("content", desc);
   } else if (head) {
@@ -697,9 +697,9 @@ function transformForSEO(document, targetUrl, origin, mirrorHostname, requestPat
     const prop = el.getAttribute("property");
     const content = el.getAttribute("content") || "";
     if (prop === "og:title") {
-      el.setAttribute("content", content.replace(/doujindesu/gi, SITE_NAME) + (content.includes(SITE_NAME) ? "" : ` - ${SITE_NAME}`));
+      el.setAttribute("content", content.replace(/doujindesu(\.\w+)?/gi, SITE_NAME) + (content.includes(SITE_NAME) ? "" : ` - ${SITE_NAME}`));
     } else if (prop === "og:description") {
-      el.setAttribute("content", content.replace(/doujindesu/gi, SITE_NAME) + ` | ${SITE_NAME}`);
+      el.setAttribute("content", content.replace(/doujindesu(\.\w+)?/gi, SITE_NAME) + ` | ${SITE_NAME}`);
     } else if (prop === "og:site_name") {
       el.setAttribute("content", SITE_NAME);
     } else if (prop === "og:url") {
